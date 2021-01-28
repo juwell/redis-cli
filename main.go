@@ -1,173 +1,248 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"os/signal"
+	"redis-cli/client"
+	"reflect"
 	"strings"
-	"syscall"
-)
 
-var (
-	cfg = newConfig()
-	cli = newClient()
+	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/extra/redisotel"
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	parseOptions()
+	fmt.Println(os.Getpid())
 
-	cli.Connect()
+	// inputReader := bufio.NewReader(os.Stdin)
+	// inputReader.ReadString('\n')
 
-	chSig := make(chan os.Signal)
-	signal.Notify(chSig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGTERM)
-	<-chSig
-}
+	root := &cobra.Command{
+		Run:     doOnce,
+		Version: client.Version(),
+		// DisableFlagsInUseLine: false,
+	}
+	root.Flags().Bool(`help`, false, `help for this command`)
+	root.Flags().BoolP(`version`, `v`, false, `Output version and exit`)
+	root.SetVersionTemplate(`redis-cli {{printf "%s" .Version}}
+`)
+	root.SetUsageTemplate(usageTemplate())
+	root.Flags().StringVarP(&client.Cfg.HostIP, `hostname`, `h`, `127.0.0.1`, `Server hostname`)
+	root.Flags().StringVarP(&client.Cfg.HostPort, `port`, `p`, `6379`, `Server port`)
+	root.Flags().StringVarP(&client.Cfg.HostSocket, `socket`, `s`, ``, `Server socket (overrides hostname and port)`)
+	root.Flags().IntVarP(&client.Cfg.DBNum, `db`, `n`, 0, `Database number`)
+	root.Flags().StringVar(&client.Cfg.UserName, `user`, ``, `Used to send ACL style 'AUTH username pass'. Needs -a`)
+	root.Flags().StringVarP(&client.Cfg.PassWord, `pass`, `a`, ``, `Password to use when connecting to the server.
+You can also use the REDISCLI_AUTH environment
+variable to pass this password more safely`)
+	root.Flags().IntVarP(&client.Cfg.ClusterMode, `cluster`, `c`, 0, `Cluster Manager command and arguments (see below).`)
 
-func simpleHelp() {
-	fmt.Printf(`redis-cli %s with redis %s
-To get help about Redis commands type:
-    "help @<group>" to get a list of commands in <group>
-    "help <command>" for help on <command>
-    "help <tab>" to get a list of possible help topics
-    "quit" to exit
+	if err := root.Execute(); err != nil {
+		fmt.Print(err.Error())
+		return
+	}
 
-To set redis-cli preferences:
-    ":set hints" enable online hints
-    ":set nohints" disable online hints
-Set your preferences in ~/.redisclirc`, Version(), RedisVersion())
-}
+	fmt.Println(`root cmd exist`)
 
-func usage() {
-	fmt.Printf(`redis-cli %s with redis %s
+	if len(client.Cfg.HostSocket) <= 0 {
+		client.Cfg.HostSocket = client.Cfg.HostIP + ":" + client.Cfg.HostPort
+	}
 
-Usage: redis-cli [OPTIONS] [cmd [arg [arg ...]]]
-  -h <hostname>      Server hostname (default: 127.0.0.1).
-  -p <port>          Server port (default: 6379).
-  -s <socket>        Server socket (overrides hostname and port).
-  -a <password>      Password to use when connecting to the server.
-					 You can also use the REDISCLI_AUTH environment
-					 variable to pass this password more safely
-					 (if both are used, this argument takes precedence).
-  --user <username>  Used to send ACL style 'AUTH username pass'. Needs -a.
-  --pass <password>  Alias of -a for consistency with the new --user option.
-  --askpass          Force user to input password with mask from STDIN.
-					 If this argument is used, '-a' and REDISCLI_AUTH
-					 environment variable will be ignored.
-  -u <uri>           Server URI.
-  -r <repeat>        Execute specified command N times.
-  -i <interval>      When -r is used, waits <interval> seconds per command.
-					 It is possible to specify sub-second times like -i 0.1.
-  -n <db>            Database number.
-  -3                 Start session in RESP3 protocol mode.
-  -x                 Read last argument from STDIN.
-  -d <delimiter>     Delimiter between response bulks for raw formatting (default: \n).
-  -D <delimiter>     Delimiter between responses for raw formatting (default: \n).
-  -c                 Enable cluster mode (follow -ASK and -MOVED redirections).
-  --tls              Establish a secure TLS connection.
-  --sni <host>       Server name indication for TLS.
-  --cacert <file>    CA Certificate file to verify with.
-  --cacertdir <dir>  Directory where trusted CA certificates are stored.
-					 If neither cacert nor cacertdir are specified, the default
-					 system-wide trusted root certs configuration will apply.
-  --cert <file>      Client certificate to authenticate with.
-  --key <file>       Private key file to authenticate with.
-  --raw              Use raw formatting for replies (default when STDOUT is
-					 not a tty).
-  --no-raw           Force formatted output even when STDOUT is not a tty.
-  --csv              Output in CSV format.
-  --stat             Print rolling stats about server: mem, clients, ...
-  --latency          Enter a special mode continuously sampling latency.
-					 If you use this mode in an interactive session it runs
-					 forever displaying real-time stats. Otherwise if --raw or
-					 --csv is specified, or if you redirect the output to a non
-					 TTY, it samples the latency for 1 second (you can use
-					 -i to change the interval), then produces a single output
-					 and exits.
-  --latency-history  Like --latency but tracking latency changes over time.
-					 Default time interval is 15 sec. Change it using -i.
-  --latency-dist     Shows latency as a spectrum, requires xterm 256 colors.
-					 Default time interval is 1 sec. Change it using -i.
-  --lru-test <keys>  Simulate a cache workload with an 80-20 distribution.
-  --replica          Simulate a replica showing commands received from the master.
-  --rdb <filename>   Transfer an RDB dump from remote server to local file.
-  --pipe             Transfer raw Redis protocol from stdin to server.
-  --pipe-timeout <n> In --pipe mode, abort with error if after sending all data.
-					 no reply is received within <n> seconds.
-					 Default timeout: 30. Use 0 to wait forever.
-  --bigkeys          Sample Redis keys looking for keys with many elements (complexity).
-  --memkeys          Sample Redis keys looking for keys consuming a lot of memory.
-  --memkeys-samples <n> Sample Redis keys looking for keys consuming a lot of memory.
-					 And define number of key elements to sample
-  --hotkeys          Sample Redis keys looking for hot keys.
-					 only works when maxmemory-policy is *lfu.
-  --scan             List all keys using the SCAN command.
-  --pattern <pat>    Keys pattern when using the --scan, --bigkeys or --hotkeys
-					 options (default: *).
-  --intrinsic-latency <sec> Run a test to measure intrinsic system latency.
-					 The test will run for the specified amount of seconds.
-  --eval <file>      Send an EVAL command using the Lua script at <file>.
-  --ldb              Used with --eval enable the Redis Lua debugger.
-  --ldb-sync-mode    Like --ldb but uses the synchronous Lua debugger, in
-					 this mode the server is blocked and script changes are
-					 not rolled back from the server memory.
-  --cluster <command> [args...] [opts...]
-					 Cluster Manager command and arguments (see below).
-  --verbose          Verbose mode.
-  --no-auth-warning  Don't show warning message when using password on command
-					 line interface.
-  --help             Output this help and exit.
-  --version          Output version and exit.
-Cluster Manager Commands:
-  Use --cluster help to list all available cluster manager commands.
-Examples:
-  cat /etc/passwd | redis-cli -x set mypasswd
-  redis-cli get mypasswd
-  redis-cli -r 100 lpush mylist x
-  redis-cli -r 100 -i 1 info | grep used_memory_human:
-  redis-cli --eval myscript.lua key1 key2 , arg1 arg2 arg3
-  redis-cli --scan --pattern '*:12345*'
-  (Note: when using --eval the comma separates KEYS[] from ARGV[] items)
-When no command is given, redis-cli starts in interactive mode.
-Type "help" in interactive mode for information on available commands
-and settings.`, Version(), RedisVersion())
-}
-
-func parseOptions() (i int) {
-	i = 1
-	for ; i < len(os.Args); i++ {
-		lastArg := i == len(os.Args)-1
-
-		switch os.Args[i] {
-		case `-h`:
-			if lastArg {
-				usage()
-			} else {
-				cfg.hostIP = os.Args[i]
-			}
-		case `--help`:
-			usage()
-		case `?`:
-			fallthrough
-		case `help`:
-			simpleHelp()
-		case `-p`:
-			if !lastArg {
-				cfg.hostPort = os.Args[i]
-			}
-		case `-s`:
-			cfg.hostSocket = os.Args[i]
-		default:
-			if os.Args[i][0] == '-' {
-				fmt.Printf(`Unrecognized option or bad number of args for: '%s'`, os.Args[i])
-			} else {
-				args := ``
-				if !lastArg {
-					args = fmt.Sprintf("`%s`,", strings.Join(os.Args[i+1:], "`, `"))
-				}
-				fmt.Printf("(error) ERR unknown command `%s`, with args beginning with:%s", os.Args[i], args)
-			}
-			os.Exit(1)
+	for i := 1; i < len(os.Args); i++ {
+		if os.Args[i] == `--help` || os.Args[i] == `--version` ||
+			os.Args[i] == `-v` || os.Args[i] == `?` {
+			return
 		}
 	}
-	return
+
+	// 连接后开始等待输入命令, 执行
+	// doing()
+}
+
+// 只执行一次
+func doOnce(c *cobra.Command, args []string) {
+	if len(args) > 0 {
+		if args[0] == `help` || args[0] == `?` {
+			simpleHelp()
+		} else {
+			// 启动连接
+			if err := client.Cli.Connect(); err != nil {
+				fmt.Printf(`Could not connect to Redis at %s: Connection refused`, client.Cfg.HostSocket)
+			} else {
+				working(args)
+
+				client.Cli.Close()
+			}
+
+		}
+		os.Exit(0)
+	} else {
+		doing()
+	}
+}
+
+// 连续执行
+func doing() {
+	if err := client.Cli.Connect(); err != nil {
+		fmt.Printf(`Could not connect to Redis at %s: Connection refused`, client.Cfg.HostSocket)
+		os.Exit(1)
+		return
+	}
+
+	inputReader := bufio.NewReader(os.Stdin)
+
+	for {
+		if len(client.Cfg.HostSocket) > 0 {
+			fmt.Printf(`%s> `, client.Cfg.HostSocket)
+		} else {
+			fmt.Printf(`%s:%s> `, client.Cfg.HostIP, client.Cfg.HostPort)
+		}
+		strs, err := inputReader.ReadString('\n')
+		strs = strs[:len(strs)-2]
+		if err != nil {
+			fmt.Println(err.Error())
+		} else if len(strs) <= 0 {
+			// 没有输入, 直接换行
+			continue
+		} else {
+			cmds := strings.Split(strs, ` `)
+			if len(cmds) <= 0 {
+				continue
+			}
+			fmt.Println(`cmds:`, cmds)
+
+			working(cmds)
+			// cmd.ClientCmd.SetArgs(cmds)
+			// cmd.ClientCmd.Execute()
+		}
+	}
+}
+
+// 执行一次命令
+func working(cmds []string) {
+	if len(cmds) <= 0 {
+		// 没有命令, 啥都不做
+		return
+	}
+
+	// 如果不需要发消息, 则会直接退出
+	if !analysisCmd(cmds) {
+		return
+	}
+
+	t := make([]interface{}, 0, len(cmds))
+	for _, s := range cmds {
+		// fmt.Println(`s:`, s)
+		if len(s) <= 0 {
+			continue
+		}
+		t = append(t, s)
+	}
+	str := ``
+
+	// fmt.Println(`here`)
+DOCOMMAND:
+	// test
+	ctx := context.Background()
+	re := client.Cli.Do(ctx, t...)
+	// fmt.Println(`here2`, re.Val())
+	val, err := re.Result()
+	// fmt.Println(`here3`, val, err)
+	switch {
+	case err == redis.Nil:
+		fmt.Println(`(nil)`)
+
+	case err != nil:
+		errStr := err.Error()
+		if client.Cfg.ClusterMode > 0 &&
+			(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
+			(len(errStr) > 3 && errStr[:3] == `ASK`) {
+			// 集群模式的重定向
+			slot := 0
+			host := ``
+			info := ``
+			fmt.Sscanf(errStr, `%s %d %s`, &info, &slot, &host)
+			temp := strings.Split(host, `:`)
+			if len(temp) == 2 {
+				client.Cfg.HostIP = temp[0]
+				client.Cfg.HostPort = temp[1]
+			}
+			client.Cfg.HostSocket = host
+
+			if err := client.Cli.Redirection(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+				return
+			}
+
+			// 加上重定向提示
+			str = fmt.Sprintf(`-> Redirected to slot [%d] located at %s
+`, slot, host)
+			goto DOCOMMAND
+		} else {
+			fmt.Println(`(error) ` + err.Error())
+		}
+
+	case err == nil:
+
+		fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
+		switch reflect.TypeOf(val).Kind() {
+		case reflect.String:
+			str += `"` + val.(string) + `"`
+		case reflect.Int64:
+			str += fmt.Sprintf(`(integer) %v`, val.(int64))
+		case reflect.Slice:
+			temp := val.([]interface{})
+			if len(temp) <= 0 {
+				str += `(empty array)`
+			}
+			for i, s := range temp {
+				if i > 0 {
+					str += `
+`
+				}
+				switch reflect.TypeOf(s).Kind() {
+				case reflect.String:
+					str += fmt.Sprintf(`%d) "%s"`, i+1, s.(string))
+				case reflect.Int64:
+					str += fmt.Sprintf(`%d) (integer) %v`, i+1, s.(int64))
+				default:
+					str += fmt.Sprintf(`%d)err type:%v, kind:%v`, i+1, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
+				}
+			}
+		default:
+			str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
+		}
+		fmt.Println(str)
+	}
+}
+
+func analysisCmd(cmds []string) bool {
+	if len(cmds) <= 0 {
+		return false
+	}
+
+	switch cmds[0] {
+	case `help`:
+		fallthrough
+	case `?`:
+		if len(cmds) == 1 {
+			simpleHelp()
+		} else if len(cmds) == 2 {
+			// 查找命令帮助
+		} else {
+			fmt.Println()
+		}
+		return false
+	case `version`:
+		fmt.Printf(`redis-cli %s
+`, client.Version())
+		return false
+	case `monitor`:
+		client.Cli.AddHook(redisotel.TracingHook{})
+	}
+	return true
 }
