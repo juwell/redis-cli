@@ -1,16 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"redis-cli/client"
+	"redis-cli/cmd"
 	"reflect"
 	"strings"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redis/extra/redisotel"
+	"github.com/peterh/liner"
 	"github.com/spf13/cobra"
 )
 
@@ -91,24 +91,49 @@ func doing() {
 		os.Exit(1)
 		return
 	}
+	commandList := []string{
+		`set key value`, `hget key field`,
+		`hgetall key`,
+	}
+	// inputReader := bufio.NewReader(os.Stdin)
+	line := liner.NewLiner()
+	line.SetCtrlCAborts(true)
+	line.SetHitsCallback(func(line string) (string, int, bool) {
+		if len(line) <= 0 {
+			return ``, liner.ColorCodeGray, false
+		}
 
-	inputReader := bufio.NewReader(os.Stdin)
+		for _, c := range commandList {
+			if strings.HasPrefix(c, line) {
+				return c[len(line):], liner.ColorCodeGray, false
+			}
+		}
+
+		return ``, liner.ColorCodeGray, false
+	})
+	prompt := ``
 
 	for {
 		if len(client.Cfg.HostSocket) > 0 {
-			fmt.Printf(`%s> `, client.Cfg.HostSocket)
+			prompt = fmt.Sprintf(`%s> `, client.Cfg.HostSocket)
 		} else {
-			fmt.Printf(`%s:%s> `, client.Cfg.HostIP, client.Cfg.HostPort)
+			prompt = fmt.Sprintf(`%s:%s> `, client.Cfg.HostIP, client.Cfg.HostPort)
 		}
-		strs, err := inputReader.ReadString('\n')
-		strs = strs[:len(strs)-2]
+		// strs, err := inputReader.ReadString('\n')
+		str, err := line.Prompt(prompt)
+		// strs = strs[:len(strs)-2]
 		if err != nil {
-			fmt.Println(err.Error())
-		} else if len(strs) <= 0 {
+			if err == liner.ErrPromptAborted {
+				os.Exit(0)
+			} else {
+				fmt.Println(err.Error())
+			}
+		} else if len(str) <= 0 {
 			// 没有输入, 直接换行
 			continue
 		} else {
-			cmds := strings.Split(strs, ` `)
+			line.AppendHistory(str)
+			cmds := strings.Split(str, ` `)
 			if len(cmds) <= 0 {
 				continue
 			}
@@ -144,80 +169,86 @@ func working(cmds []string) {
 	str := ``
 
 	// fmt.Println(`here`)
-DOCOMMAND:
-	// test
-	ctx := context.Background()
-	re := client.Cli.Do(ctx, t...)
-	// fmt.Println(`here2`, re.Val())
-	val, err := re.Result()
-	// fmt.Println(`here3`, val, err)
-	switch {
-	case err == redis.Nil:
-		fmt.Println(`(nil)`)
+	switch t[0] {
+	case "monitor":
+		cmd.MonitorCmd.SetArgs(cmds)
+		cmd.MonitorCmd.Execute()
+	default:
+		// 直接发到服务器, 然后打印返回信息
+	DOCOMMAND:
+			ctx := context.Background()
+			re := client.Cli.Do(ctx, t...)
+			val, err := re.Result()
+		switch {
+		case err == redis.Nil:
+			fmt.Println(`(nil)`)
 
-	case err != nil:
-		errStr := err.Error()
-		if client.Cfg.ClusterMode > 0 &&
-			(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
-			(len(errStr) > 3 && errStr[:3] == `ASK`) {
-			// 集群模式的重定向
-			slot := 0
-			host := ``
-			info := ``
-			fmt.Sscanf(errStr, `%s %d %s`, &info, &slot, &host)
-			temp := strings.Split(host, `:`)
-			if len(temp) == 2 {
-				client.Cfg.HostIP = temp[0]
-				client.Cfg.HostPort = temp[1]
-			}
-			client.Cfg.HostSocket = host
-
-			if err := client.Cli.Redirection(); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-				return
-			}
-
-			// 加上重定向提示
-			str = fmt.Sprintf(`-> Redirected to slot [%d] located at %s
-`, slot, host)
-			goto DOCOMMAND
-		} else {
-			fmt.Println(`(error) ` + err.Error())
-		}
-
-	case err == nil:
-
-		fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
-		switch reflect.TypeOf(val).Kind() {
-		case reflect.String:
-			str += `"` + val.(string) + `"`
-		case reflect.Int64:
-			str += fmt.Sprintf(`(integer) %v`, val.(int64))
-		case reflect.Slice:
-			temp := val.([]interface{})
-			if len(temp) <= 0 {
-				str += `(empty array)`
-			}
-			for i, s := range temp {
-				if i > 0 {
-					str += `
-`
+		case err != nil:
+			errStr := err.Error()
+			if client.Cfg.ClusterMode > 0 &&
+				(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
+				(len(errStr) > 3 && errStr[:3] == `ASK`) {
+				// 集群模式的重定向
+				slot := 0
+				host := ``
+				info := ``
+				fmt.Sscanf(errStr, `%s %d %s`, &info, &slot, &host)
+				temp := strings.Split(host, `:`)
+				if len(temp) == 2 {
+					client.Cfg.HostIP = temp[0]
+					client.Cfg.HostPort = temp[1]
 				}
-				switch reflect.TypeOf(s).Kind() {
-				case reflect.String:
-					str += fmt.Sprintf(`%d) "%s"`, i+1, s.(string))
-				case reflect.Int64:
-					str += fmt.Sprintf(`%d) (integer) %v`, i+1, s.(int64))
-				default:
-					str += fmt.Sprintf(`%d)err type:%v, kind:%v`, i+1, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
+				client.Cfg.HostSocket = host
+
+				if err := client.Cli.Redirection(); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+					return
 				}
+
+				// 加上重定向提示
+				str = fmt.Sprintf(`-> Redirected to slot [%d] located at %s
+	`, slot, host)
+				goto DOCOMMAND
+			} else {
+				fmt.Println(`(error) ` + err.Error())
 			}
-		default:
-			str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
+
+		case err == nil:
+
+			fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
+			switch reflect.TypeOf(val).Kind() {
+			case reflect.String:
+				str += `"` + val.(string) + `"`
+			case reflect.Int64:
+				str += fmt.Sprintf(`(integer) %v`, val.(int64))
+			case reflect.Slice:
+				temp := val.([]interface{})
+				if len(temp) <= 0 {
+					str += `(empty array)`
+				}
+				for i, s := range temp {
+					if i > 0 {
+						str += `
+	`
+					}
+					switch reflect.TypeOf(s).Kind() {
+					case reflect.String:
+						str += fmt.Sprintf(`%d) "%s"`, i+1, s.(string))
+					case reflect.Int64:
+						str += fmt.Sprintf(`%d) (integer) %v`, i+1, s.(int64))
+					default:
+						str += fmt.Sprintf(`%d)err type:%v, kind:%v`, i+1, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
+					}
+				}
+			default:
+				str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
+			}
+			fmt.Println(str)
 		}
-		fmt.Println(str)
 	}
+	// test
+
 }
 
 func analysisCmd(cmds []string) bool {
@@ -241,8 +272,6 @@ func analysisCmd(cmds []string) bool {
 		fmt.Printf(`redis-cli %s
 `, client.Version())
 		return false
-	case `monitor`:
-		client.Cli.AddHook(redisotel.TracingHook{})
 	}
 	return true
 }
