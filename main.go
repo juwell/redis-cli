@@ -91,26 +91,14 @@ func doing() {
 		os.Exit(1)
 		return
 	}
-	commandList := []string{
-		`set key value`, `hget key field`,
-		`hgetall key`,
-	}
+	// commandList := []string{
+	// 	`set key value`, `hget key field`,
+	// 	`hgetall key`,
+	// }
 	// inputReader := bufio.NewReader(os.Stdin)
 	line := liner.NewLiner()
 	line.SetCtrlCAborts(true)
-	line.SetHitsCallback(func(line string) (string, int, bool) {
-		if len(line) <= 0 {
-			return ``, liner.ColorCodeGray, false
-		}
-
-		for _, c := range commandList {
-			if strings.HasPrefix(c, line) {
-				return c[len(line):], liner.ColorCodeGray, false
-			}
-		}
-
-		return ``, liner.ColorCodeGray, false
-	})
+	line.SetHitsCallback(hitsCallback)
 	prompt := ``
 
 	for {
@@ -137,11 +125,9 @@ func doing() {
 			if len(cmds) <= 0 {
 				continue
 			}
-			fmt.Println(`cmds:`, cmds)
+			// fmt.Println(`cmds:`, cmds)
 
 			working(cmds)
-			// cmd.ClientCmd.SetArgs(cmds)
-			// cmd.ClientCmd.Execute()
 		}
 	}
 }
@@ -176,9 +162,9 @@ func working(cmds []string) {
 	default:
 		// 直接发到服务器, 然后打印返回信息
 	DOCOMMAND:
-			ctx := context.Background()
-			re := client.Cli.Do(ctx, t...)
-			val, err := re.Result()
+		ctx := context.Background()
+		re := client.Cli.Do(ctx, t...)
+		val, err := re.Result()
 		switch {
 		case err == redis.Nil:
 			fmt.Println(`(nil)`)
@@ -216,7 +202,7 @@ func working(cmds []string) {
 
 		case err == nil:
 
-			fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
+			// fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
 			switch reflect.TypeOf(val).Kind() {
 			case reflect.String:
 				str += `"` + val.(string) + `"`
@@ -247,8 +233,6 @@ func working(cmds []string) {
 			fmt.Println(str)
 		}
 	}
-	// test
-
 }
 
 func analysisCmd(cmds []string) bool {
@@ -262,8 +246,15 @@ func analysisCmd(cmds []string) bool {
 	case `?`:
 		if len(cmds) == 1 {
 			simpleHelp()
-		} else if len(cmds) == 2 {
+		} else if len(cmds) >= 2 {
 			// 查找命令帮助
+			c := strings.Join(cmds[1:], ` `)
+			h, ok := cmd.CommandHelps.Find(c)
+			if !ok {
+				fmt.Println()
+			} else {
+				fmt.Println(commandHelpTemplate(h))
+			}
 		} else {
 			fmt.Println()
 		}
@@ -274,4 +265,76 @@ func analysisCmd(cmds []string) bool {
 		return false
 	}
 	return true
+}
+
+func hitsCallback(line string) (string, int, bool) {
+	if len(line) <= 0 {
+		return ``, liner.ColorCodeGray, false
+	}
+
+	lines := strings.Split(line, ` `)
+	if len(lines) <= 0 {
+		lines = []string{line}
+	} else {
+		for i := 0; i < len(lines); i++ {
+			if len(lines[i]) <= 0 {
+				lines = append(lines[:i], lines[i+1:]...)
+				i--
+			}
+		}
+	}
+	parms := make([]string, 0, 10)
+	control := false
+	conStr := ``
+	index := 0
+	for i := len(lines); i >= 0; i-- {
+		if h, ok := cmd.CommandHelps.Find(strings.Join(lines[:i], ` `)); ok {
+			// 整理参数
+			index = 0
+			conStr = ``
+			control = false
+			for t := 0; t < len(h.Params); t++ {
+				switch h.Params[t] {
+				case '[':
+					control = true
+					conStr += string(h.Params[t])
+				case ']':
+					control = false
+					conStr += string(h.Params[t])
+					index = t + 1
+				case ' ':
+					if control {
+						conStr += string(h.Params[t])
+					} else if index == t {
+						index++
+					} else {
+						parms = append(parms, h.Params[index:t])
+						index = t + 1
+					}
+				default:
+					if control {
+						conStr += string(h.Params[t])
+					}
+				}
+			}
+
+			outStr := conStr
+			if len(lines)-1 < len(parms) {
+				outStr = strings.Join(parms[len(lines)-1:], ` `) + ` ` + conStr
+			}
+
+			if line[len(line)-1] != ' ' {
+				return ` ` + outStr, liner.ColorCodeGray, false
+			}
+			return outStr, liner.ColorCodeGray, false
+		}
+	}
+
+	// if h, ok := cmd.CommandHelps.Find(line); ok {
+	// 	if line[len(line)-1] != ' ' {
+	// 		return ` ` + h.Params, liner.ColorCodeGray, false
+	// 	}
+	// 	return h.Params, liner.ColorCodeGray, false
+	// }
+	return ``, liner.ColorCodeGray, false
 }

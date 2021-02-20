@@ -18,24 +18,9 @@ var (
 			} else {
 				c.Do(func(d []byte) {
 					if len(d) <= 0 {
-						fmt.Println(`[E] len(d) <= 0`)
+						// fmt.Println(`[E] len(d) <= 0`)
 						return
 					}
-
-					// switch d[0] {
-					// case '-':
-					// case '+':
-					// case ':':
-					// case ',':
-					// case '_':
-					// case '$':
-					// case '*':
-					// case '%':
-					// case '~':
-					// case '#':
-					// case '=':
-					// case '>':
-					// }
 
 					fmt.Println(string(d[1:]))
 				})
@@ -44,8 +29,3 @@ var (
 		},
 	}
 )
-
-// func monitorProcess(ctx context.Context, cmd redis.Cmder) error {
-// 	conn := client.Cli.Conn(ctx)
-
-// }

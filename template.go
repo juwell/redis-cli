@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"redis-cli/client"
+	"redis-cli/cmd"
 )
 
 func simpleHelp() {
@@ -137,4 +138,14 @@ Type "help" in interactive mode for information on available commands
 and settings.
 
 `
+}
+
+func commandHelpTemplate(h cmd.CommandHelp) string {
+	out := fmt.Sprintf("\r\n  \x1b[1m%s\x1b[0m \x1b[90m%s\x1b[0m\r\n", h.Name, h.Params)
+	out += fmt.Sprintf("  \x1b[33msummary:\x1b[0m %s\r\n", h.Summary)
+	out += fmt.Sprintf("  \x1b[33msince:\x1b[0m %s\r\n", h.Since)
+	if len(h.Group) > 0 {
+		out += fmt.Sprintf("  \x1b[33mgroup:\x1b[0m %s\r\n", h.Group)
+	}
+	return out
 }
