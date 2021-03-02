@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"redis-cli/client"
 	"redis-cli/cmd"
-	"reflect"
 	"strings"
 
 	"github.com/go-redis/redis/v8"
@@ -62,6 +60,18 @@ variable to pass this password more safely`)
 	// doing()
 }
 
+var cli *client.SimpleClient
+
+func createRedisOption() redis.Options {
+	opt := redis.Options{}
+	if len(client.Cfg.HostSocket) <= 0 {
+		opt.Addr = client.Cfg.HostIP + `:` + client.Cfg.HostPort
+	} else {
+		opt.Addr = client.Cfg.HostSocket
+	}
+	return opt
+}
+
 // 只执行一次
 func doOnce(c *cobra.Command, args []string) {
 	if len(args) > 0 {
@@ -69,12 +79,16 @@ func doOnce(c *cobra.Command, args []string) {
 			simpleHelp()
 		} else {
 			// 启动连接
-			if err := client.Cli.Connect(); err != nil {
+			opt := createRedisOption()
+			cli = client.NewSimpleClient(opt)
+			// if err := client.Cli.Connect(); err != nil {
+			if err := cli.Connect(); err != nil {
 				fmt.Printf(`Could not connect to Redis at %s: Connection refused`, client.Cfg.HostSocket)
 			} else {
 				working(args)
 
-				client.Cli.Close()
+				// client.Cli.Close()
+				cli.Close()
 			}
 
 		}
@@ -86,7 +100,10 @@ func doOnce(c *cobra.Command, args []string) {
 
 // 连续执行
 func doing() {
-	if err := client.Cli.Connect(); err != nil {
+	opt := createRedisOption()
+	cli = client.NewSimpleClient(opt)
+	// if err := client.Cli.Connect(); err != nil {
+	if err := cli.Connect(); err != nil {
 		fmt.Printf(`Could not connect to Redis at %s: Connection refused`, client.Cfg.HostSocket)
 		os.Exit(1)
 		return
@@ -145,34 +162,28 @@ func working(cmds []string) {
 		return
 	}
 
-	t := make([]interface{}, 0, len(cmds))
-	for _, s := range cmds {
-		// fmt.Println(`s:`, s)
-		if len(s) <= 0 {
-			continue
-		}
-		t = append(t, s)
-	}
+	// t := make([]interface{}, 0, len(cmds))
+	// for _, s := range cmds {
+	// 	// fmt.Println(`s:`, s)
+	// 	if len(s) <= 0 {
+	// 		continue
+	// 	}
+	// 	t = append(t, s)
+	// }
 	str := ``
 
 	// fmt.Println(`here`)
-	switch t[0] {
+	switch cmds[0] {
 	case "monitor":
 		cmd.MonitorCmd.SetArgs(cmds)
 		cmd.MonitorCmd.Execute()
 	default:
 		// 直接发到服务器, 然后打印返回信息
 	DOCOMMAND:
-		ctx := context.Background()
-		re := client.Cli.Do(ctx, t...)
-		val, err := re.Result()
-		switch {
-		case err == redis.Nil:
-			fmt.Println(`(nil)`)
-
-		case err != nil:
-			errStr := err.Error()
-			if client.Cfg.ClusterMode > 0 &&
+		re := cli.Do(cmds...)
+		if re.Err != nil {
+			errStr := re.Err.Error()
+			if client.Cfg.ClusterMode &&
 				(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
 				(len(errStr) > 3 && errStr[:3] == `ASK`) {
 				// 集群模式的重定向
@@ -187,52 +198,137 @@ func working(cmds []string) {
 				}
 				client.Cfg.HostSocket = host
 
-				if err := client.Cli.Redirection(); err != nil {
+				opt := createRedisOption()
+				if err := cli.Redirection(opt); err != nil {
 					fmt.Println(err)
 					os.Exit(1)
 					return
 				}
 
+				// if err := client.Cli.Redirection(); err != nil {
+				// 	fmt.Println(err)
+				// 	os.Exit(1)
+				// 	return
+				// }
+
 				// 加上重定向提示
-				str = fmt.Sprintf(`-> Redirected to slot [%d] located at %s
-	`, slot, host)
+				str = fmt.Sprintf("-> Redirected to slot [%d] located at %s\n", slot, host)
 				goto DOCOMMAND
 			} else {
-				fmt.Println(`(error) ` + err.Error())
+				fmt.Println(`(error) ` + errStr)
 			}
-
-		case err == nil:
-
-			// fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
-			switch reflect.TypeOf(val).Kind() {
-			case reflect.String:
-				str += `"` + val.(string) + `"`
-			case reflect.Int64:
-				str += fmt.Sprintf(`(integer) %v`, val.(int64))
-			case reflect.Slice:
-				temp := val.([]interface{})
-				if len(temp) <= 0 {
-					str += `(empty array)`
-				}
-				for i, s := range temp {
-					if i > 0 {
-						str += `
-	`
-					}
-					switch reflect.TypeOf(s).Kind() {
-					case reflect.String:
-						str += fmt.Sprintf(`%d) "%s"`, i+1, s.(string))
-					case reflect.Int64:
-						str += fmt.Sprintf(`%d) (integer) %v`, i+1, s.(int64))
-					default:
-						str += fmt.Sprintf(`%d)err type:%v, kind:%v`, i+1, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
-					}
-				}
-			default:
-				str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
-			}
+			fmt.Println(re.Err)
+		} else {
+			str = getFormatValueStr(&re, 0)
 			fmt.Println(str)
 		}
+		// ctx := context.Background()
+		// re := client.Cli.Do(ctx, t...)
+		// val, err := re.Result()
+		// switch {
+		// case err == redis.Nil:
+		// 	fmt.Println(`(nil)`)
+
+		// case err != nil:
+		// 	errStr := err.Error()
+		// 	if client.Cfg.ClusterMode &&
+		// 		(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
+		// 		(len(errStr) > 3 && errStr[:3] == `ASK`) {
+		// 		// 集群模式的重定向
+		// 		slot := 0
+		// 		host := ``
+		// 		info := ``
+		// 		fmt.Sscanf(errStr, `%s %d %s`, &info, &slot, &host)
+		// 		temp := strings.Split(host, `:`)
+		// 		if len(temp) == 2 {
+		// 			client.Cfg.HostIP = temp[0]
+		// 			client.Cfg.HostPort = temp[1]
+		// 		}
+		// 		client.Cfg.HostSocket = host
+
+		// 		if err := client.Cli.Redirection(); err != nil {
+		// 			fmt.Println(err)
+		// 			os.Exit(1)
+		// 			return
+		// 		}
+
+		// 		// 加上重定向提示
+		// 		str = fmt.Sprintf("-> Redirected to slot [%d] located at %s\n", slot, host)
+		// 		goto DOCOMMAND
+		// 	} else {
+		// 		fmt.Println(`(error) ` + err.Error())
+		// 	}
+
+		// case err == nil:
+
+		// 	// fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
+		// 	switch reflect.TypeOf(val).Kind() {
+		// 	case reflect.String:
+		// 		str += `"` + val.(string) + `"`
+		// 	case reflect.Int64:
+		// 		str += fmt.Sprintf(`(integer) %v`, val.(int64))
+		// 	case reflect.Slice:
+		// 		temp := val.([]interface{})
+		// 		if len(temp) <= 0 {
+		// 			str += `(empty array)`
+		// 		}
+		// 		for i, s := range temp {
+		// 			if i > 0 {
+		// 				str += "\n"
+		// 			}
+		// 			str += fmt.Sprintf(`%d) `, i+1)
+		// 			switch reflect.TypeOf(s).Kind() {
+		// 			case reflect.String:
+		// 				str += fmt.Sprintf(`"%s"`, s.(string))
+		// 			case reflect.Int64:
+		// 				str += fmt.Sprintf(`(integer) %v`, s.(int64))
+		// 			case reflect.Slice:
+		// 				temp2 := s.([]interface{})
+		// 				if len(temp2) <= 0 {
+		// 					str += fmt.Sprintf(`(empty array) %v`, s.(int64))
+		// 				}
+		// 				for t, v := range temp2 {
+		// 					if t > 0 {
+		// 						str += "\n   "
+		// 					}
+		// 					str += fmt.Sprintf("%d) ", t+1)
+		// 					switch reflect.TypeOf(v).Kind() {
+		// 					case reflect.String:
+		// 						str += fmt.Sprintf(`"%s"`, v.(string))
+		// 					case reflect.Int64:
+		// 						str += fmt.Sprintf(`(integer) %v`, v.(int64))
+		// 					case reflect.Slice:
+		// 						temp3 := v.([]interface{})
+		// 						if len(temp3) <= 0 {
+		// 							str += fmt.Sprintf(`(empty array) %v`, v.(int64))
+		// 						}
+
+		// 						for z, x := range temp3 {
+		// 							if z > 0 {
+		// 								str += "\n      "
+		// 							}
+
+		// 							str += fmt.Sprintf("%d) ", z+1)
+		// 							switch reflect.TypeOf(x).Kind() {
+		// 							case reflect.String:
+		// 								str += fmt.Sprintf(`"%s"`, x.(string))
+		// 							case reflect.Int64:
+		// 								str += fmt.Sprintf(`(integer) %v`, x.(int64))
+		// 							default:
+		// 								str += fmt.Sprintf(`err type3:%v, kind:%v`, reflect.TypeOf(x), reflect.TypeOf(x).Kind())
+		// 							}
+		// 						}
+		// 					}
+		// 				}
+		// 			default:
+		// 				str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
+		// 			}
+		// 		}
+		// 	default:
+		// 		str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
+		// 	}
+		// 	fmt.Println(str)
+		// }
 	}
 }
 
@@ -374,4 +470,53 @@ func completionCallback(line string, pos int) (head string, completions []string
 	}
 
 	return
+}
+
+func getFormatValueStr(r *client.RedisReply, dep int) string {
+	if r == nil {
+		return ``
+	}
+
+	str := ``
+	switch r.Type {
+	case client.ErrorReply:
+		str = fmt.Sprintf(`(error) %v`, r.GetString())
+	case client.StatusReply:
+		fallthrough
+	case client.VerbReply:
+		str = r.GetString()
+	case client.IntReply:
+		str = fmt.Sprintf(`(integer) %v`, r.GetInt64())
+	case client.StringReply:
+		str = fmt.Sprintf(`"%v"`, r.GetString())
+	case client.DoubleReply:
+		str = fmt.Sprintf(`(double) %v`, r.GetFloat64())
+	case client.NilReply:
+		str = `(nil)`
+	case client.BoolReply:
+		if r.GetBool() {
+			str = "(true)"
+		} else {
+			str = "(false)"
+		}
+	case client.ArrayReply:
+		arry := r.GetArray()
+		if len(arry) == 0 {
+			str = "(empty array)"
+		} else {
+			for i := 0; i < len(arry); i++ {
+				if i > 0 && dep > 0 {
+					for t := 0; t < dep; t++ {
+						str += "   "
+					}
+				}
+				str += fmt.Sprintf("%d) ", i+1)
+				str += getFormatValueStr(&arry[i], dep+1)
+				if i < len(arry)-1 {
+					str += "\n"
+				}
+			}
+		}
+	}
+	return str
 }

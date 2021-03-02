@@ -17,7 +17,7 @@ type Config struct {
 	UserName    string
 	PassWord    string
 	DBNum       int
-	ClusterMode int
+	ClusterMode bool
 	SlaveMode   int
 	ShutDown    int
 	Eval        string
