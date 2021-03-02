@@ -99,6 +99,7 @@ func doing() {
 	line := liner.NewLiner()
 	line.SetCtrlCAborts(true)
 	line.SetHitsCallback(hitsCallback)
+	line.SetWordCompleter(completionCallback)
 	prompt := ``
 
 	for {
@@ -346,4 +347,31 @@ func hitsCallback(line string) (string, int, bool) {
 	// 	return h.Params, liner.ColorCodeGray, false
 	// }
 	return ``, liner.ColorCodeGray, false
+}
+
+func completionCallback(line string, pos int) (head string, completions []string, tail string) {
+	if strings.HasPrefix(strings.ToUpper(line), `HELP `) {
+		head = line[:5]
+		line = line[5:]
+		pos -= 5
+	}
+
+	tail = line[pos:]
+	i := strings.LastIndex(line[:pos], ` `)
+	if i > 0 && i < len(line) {
+		head += line[:i]
+	}
+	if pos < len(line) {
+		tail = line[pos+1:]
+	}
+	tempStr := line[i+1 : pos]
+
+	completions = make([]string, 0, 10)
+	for key := range cmd.CommandHelps {
+		if strings.HasPrefix(key, strings.ToUpper(tempStr)) {
+			completions = append(completions, key)
+		}
+	}
+
+	return
 }
