@@ -38,14 +38,14 @@ func main() {
 	root.Flags().StringVarP(&client.Cfg.PassWord, `pass`, `a`, ``, `Password to use when connecting to the server.
 You can also use the REDISCLI_AUTH environment
 variable to pass this password more safely`)
-	root.Flags().IntVarP(&client.Cfg.ClusterMode, `cluster`, `c`, 0, `Cluster Manager command and arguments (see below).`)
+	root.Flags().BoolVarP(&client.Cfg.ClusterMode, `cluster`, `c`, false, `Cluster Manager command and arguments (see below).`)
 
 	if err := root.Execute(); err != nil {
 		fmt.Print(err.Error())
 		return
 	}
 
-	fmt.Println(`root cmd exist`)
+	// fmt.Println(`root cmd exist`)
 
 	if len(client.Cfg.HostSocket) <= 0 {
 		client.Cfg.HostSocket = client.Cfg.HostIP + ":" + client.Cfg.HostPort
@@ -260,8 +260,7 @@ func analysisCmd(cmds []string) bool {
 		}
 		return false
 	case `version`:
-		fmt.Printf(`redis-cli %s
-`, client.Version())
+		fmt.Printf(versionTemplate())
 		return false
 	}
 	return true
@@ -287,12 +286,15 @@ func hitsCallback(line string) (string, int, bool) {
 	control := false
 	conStr := ``
 	index := 0
+	temp := ``
 	for i := len(lines); i >= 0; i-- {
+		// fmt.Println(`[test]`, lines[:i])
 		if h, ok := cmd.CommandHelps.Find(strings.Join(lines[:i], ` `)); ok {
 			// 整理参数
 			index = 0
 			conStr = ``
 			control = false
+			temp = ``
 			for t := 0; t < len(h.Params); t++ {
 				switch h.Params[t] {
 				case '[':
@@ -308,14 +310,21 @@ func hitsCallback(line string) (string, int, bool) {
 					} else if index == t {
 						index++
 					} else {
-						parms = append(parms, h.Params[index:t])
+						parms = append(parms, temp)
 						index = t + 1
+						temp = ``
 					}
 				default:
 					if control {
 						conStr += string(h.Params[t])
+					} else {
+						temp += string(h.Params[t])
 					}
 				}
+			}
+
+			if len(temp) > 0 {
+				parms = append(parms, temp)
 			}
 
 			outStr := conStr

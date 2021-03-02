@@ -149,3 +149,7 @@ func commandHelpTemplate(h cmd.CommandHelp) string {
 	}
 	return out
 }
+
+func versionTemplate() string {
+	return fmt.Sprintf("redis-cli(by golang) %s for redis-server %s\n", client.Version(), client.RedisVersion())
+}
