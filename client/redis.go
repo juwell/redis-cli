@@ -182,17 +182,19 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 	out.Type = rune(data[0])
 	switch data[0] {
 	case ErrorReply:
-		fallthrough
+		out.Err = errors.New(string(data[1 : len(data)-2]))
+		readCount = len(data)
 	case StatusReply:
-		out.Reply = string(data[1:])
+		out.Reply = string(data[1 : len(data)-2])
 		readCount = len(data)
 	case StringReply:
 		// todo 字符串不能这样直接赋值, 字符串还标出了长度
 		fallthrough
 	case VerbReply:
 		/*
-			$14
-			123.123.123.123
+			例:
+				$14
+				123.123.123.123
 		*/
 		i := strings.Index(string(data), "\r\n")
 		count, _ := strconv.Atoi(string(data[1:i]))

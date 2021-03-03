@@ -199,8 +199,10 @@ func working(cmds []string) {
 				client.Cfg.HostSocket = host
 
 				opt := createRedisOption()
-				if err := cli.Redirection(opt); err != nil {
-					fmt.Println(err)
+				cli.Close()
+				cli = client.NewSimpleClient(opt)
+				if err := cli.Connect(); err != nil {
+					fmt.Printf(`Could not connect to Redis at %s: Connection refused`, client.Cfg.HostSocket)
 					os.Exit(1)
 					return
 				}
@@ -219,8 +221,12 @@ func working(cmds []string) {
 			}
 			fmt.Println(re.Err)
 		} else {
-			str = getFormatValueStr(&re, 0)
-			fmt.Println(str)
+			str += getFormatValueStr(&re, 0)
+			if str[len(str)-1] == '\n' {
+				fmt.Print(str)
+			} else {
+				fmt.Println(str)
+			}
 		}
 		// ctx := context.Background()
 		// re := client.Cli.Do(ctx, t...)

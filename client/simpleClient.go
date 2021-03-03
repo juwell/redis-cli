@@ -138,6 +138,9 @@ func (m *SimpleClient) Close() {
 }
 
 func (m *SimpleClient) readGoroutine() {
+	defer func() {
+		recover()
+	}()
 	data := make([]byte, 1024*16)
 	r := bufio.NewReader(m.conn)
 	for {
@@ -148,18 +151,17 @@ func (m *SimpleClient) readGoroutine() {
 			}
 		default:
 		}
-		_, err := r.Read(data)
+		n, err := r.Read(data)
 		// fmt.Println(`[test]`, string(data))
 		// _, err := r.Read(data)
 		if err != nil {
-			fmt.Println(err)
-			defer recover()
+			// fmt.Println("(debug)", err)
 			close(m.exit)
 			return
 		}
 
 		m.readBuff <- Buffer{
-			Buff: data,
+			Buff: data[:n],
 		}
 	}
 }
@@ -180,7 +182,9 @@ func (m *SimpleClient) writeGoroutine() {
 }
 
 func (m *SimpleClient) Send(data []byte) error {
-	defer recover()
+	defer func() {
+		recover()
+	}()
 
 	select {
 	case _, ok := <-m.exit:
@@ -197,7 +201,9 @@ func (m *SimpleClient) Send(data []byte) error {
 }
 
 func (m *SimpleClient) handleGoroutine() {
-	defer recover()
+	defer func() {
+		recover()
+	}()
 
 	for {
 		select {
@@ -212,12 +218,12 @@ func (m *SimpleClient) handleGoroutine() {
 	}
 }
 
-func (m *SimpleClient) Redirection(opt redis.Options) error {
-	if m.option.Addr != opt.Addr || m.option.Network != opt.Network {
-		m.option = opt
+// func (m *SimpleClient) Redirection(opt redis.Options) error {
+// 	if m.option.Addr != opt.Addr || m.option.Network != opt.Network {
+// 		m.option = opt
 
-		m.Close()
-		return m.Connect()
-	}
-	return nil
-}
+// 		m.Close()
+// 		return m.Connect()
+// 	}
+// 	return nil
+// }
