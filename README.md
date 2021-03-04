@@ -1,14 +1,16 @@
-# redis-cli for win
+# redis-cli by golang
 
-众所周知, Win下要使用`redis-cli`命令, 要么`wsl`, 要么`docker`, 甚至可以在`VMware`下安装一个linux系统, 再安装`redis-cli`, 这些都没有直接在命令行下执行`redis-cli.exe`来的方便.
+[Chinese](./ZH.md)
 
-而早期, 微软有维护一个项目, 但停留在3.0阶段, 已经废弃了.
+As you know, if you want use `redis-cli` command in Windows, you can use `wsl`, or `docker`(install docker, and install redis container, than use `docker exec -it redis redis-cli` command), even can install `VMware` and install a `Linux` system.
+All of these ways are not convenient than using `redis-cli` directly in Windows.
 
-而redis官方的则是用c写的, 而且只支持linux系统, 要在win上编译, 则需要改大量代码, 估计也是这个原因, 让微软放弃了.
+There is a respository by Microsoft, but it is discarded.
 
+And the official `redis-cli` is writed by `c`, it is just used in Linux.
 
-## 要解决的问题
+So I dicided rewrite a new `redis-cli` by `golang`, because `golang` is cross-platform's language.
 
-* 输入跟踪, 并提示
-    * 还有问题的命令:
-        * AUTH
+This `redis-cli` is same as official `redis-cli` in the operate and the result.
+
+You can download the executable file in `Releases`, and put it into `$PATH`, that't it.
