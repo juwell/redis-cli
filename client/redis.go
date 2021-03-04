@@ -46,6 +46,7 @@ func (r *RedisReply) GetString() string {
 		r.Type != StatusReply && r.Type != VerbReply {
 		return ``
 	}
+
 	return r.Reply.(string)
 }
 
@@ -127,7 +128,9 @@ func (c *commands) handler(data []byte) {
 }
 
 func (c *commands) putReply(r RedisReply) {
-	defer recover()
+	defer func() {
+		recover()
+	}()
 
 	select {
 	case c.replyBuf <- r:
@@ -135,7 +138,9 @@ func (c *commands) putReply(r RedisReply) {
 	}
 }
 func (c *commands) getReply() RedisReply {
-	defer recover()
+	defer func() {
+		recover()
+	}()
 
 	r, ok := <-c.replyBuf
 
@@ -198,7 +203,11 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 		*/
 		i := strings.Index(string(data), "\r\n")
 		count, _ := strconv.Atoi(string(data[1:i]))
-		out.Reply = string(data[i+2 : i+2+count])
+		if count < 0 {
+			out.Type = NilReply
+		} else {
+			out.Reply = string(data[i+2 : i+2+count])
+		}
 		readCount = 2 + i + count
 	case IntReply:
 		i := strings.Index(string(data), "\r\n")
@@ -257,9 +266,10 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 			out.Reply = arry
 		}
 	case MapReply:
-		fallthrough
+		fmt.Printf("(debug) Map:%v", string(data))
 	case SetReply:
 
+		fmt.Printf("(debug) Set:%v", string(data))
 	default:
 		out.Err = fmt.Errorf(`Protocol error, got %s as reply type byte`, data)
 	}
@@ -267,17 +277,4 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 	// out.Reply = data[1:]
 	// 最后+2是因为结束符号为"\r\n"
 	return out, readCount + 2
-}
-
-func (c *commands) processAggregateItem(data []byte) RedisReply {
-	out := RedisReply{}
-
-	if len(data) <= 0 {
-		return out
-	}
-
-	switch data[0] {
-
-	}
-	return out
 }

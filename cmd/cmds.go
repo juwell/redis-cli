@@ -88,7 +88,7 @@ var CommandHelps = CaseMap{
 		cmdGroupString,
 		"2.0.0"},
 	"AUTH": {"AUTH",
-		"password",
+		"username password",
 		"Authenticate to the server",
 		cmdGroupConnection,
 		"1.0.0"},

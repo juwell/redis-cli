@@ -125,7 +125,9 @@ func (m *SimpleClient) Connect() error {
 }
 
 func (m *SimpleClient) Close() {
-	defer recover()
+	defer func() {
+		recover()
+	}()
 
 	if m.conn != nil {
 		m.conn.Close()
@@ -202,7 +204,9 @@ func (m *SimpleClient) Send(data []byte) error {
 
 func (m *SimpleClient) handleGoroutine() {
 	defer func() {
-		recover()
+		if err := recover(); err != nil {
+			fmt.Println("(debug)", err)
+		}
 	}()
 
 	for {
