@@ -157,19 +157,19 @@ func working(cmds []string) {
 		return
 	}
 
+	c := strings.ToUpper(cmds[0])
 	// 如果不需要发消息, 则会直接退出
-	if !analysisCmd(cmds) {
+	if !analysisCmd(c, cmds[1:]) {
 		return
 	}
 
 	str := ``
 
-	c := strings.ToLower(cmds[0])
 	switch c {
-	case "subscribe":
+	case "SUBSCRIBE":
 		fmt.Println("Reading messages... (press Ctrl-C to quit)")
 		fallthrough
-	case "monitor":
+	case "MONITOR":
 		// cmd.MonitorCmd.SetArgs(cmds)
 		// cmd.MonitorCmd.Execute()
 		cli.Doing(func(reply client.RedisReply) {
@@ -210,7 +210,6 @@ func working(cmds []string) {
 			} else {
 				fmt.Println(`(error) ` + errStr)
 			}
-			fmt.Println(re.Err)
 		} else {
 			str += getFormatValueStr(&re, 0)
 			if str[len(str)-1] == '\n' {
@@ -222,13 +221,13 @@ func working(cmds []string) {
 	}
 }
 
-func analysisCmd(cmds []string) bool {
-	if len(cmds) <= 0 {
+func analysisCmd(c string, cmds []string) bool {
+	if len(c) <= 0 && len(cmds) <= 0 {
 		return false
 	}
 
-	switch cmds[0] {
-	case `help`:
+	switch c {
+	case `HELP`:
 		fallthrough
 	case `?`:
 		if len(cmds) == 1 {
@@ -246,8 +245,11 @@ func analysisCmd(cmds []string) bool {
 			fmt.Println()
 		}
 		return false
-	case `version`:
+	case `VERSION`:
 		fmt.Printf(versionTemplate())
+		return false
+	case `QUIT`:
+		os.Exit(0)
 		return false
 	}
 	return true
