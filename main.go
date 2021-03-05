@@ -12,6 +12,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// var logFile *os.File
+
+// func init() {
+// 	var err error
+// 	logFile, err = os.Create("log")
+// 	if err != nil {
+// 		fmt.Println("(debug)", err)
+// 		os.Exit(1)
+// 		return
+// 	}
+// 	log.SetOutput(logFile)
+// }
+
 func main() {
 	// fmt.Println("(debug)", os.Getpid())
 
@@ -212,10 +225,12 @@ func working(cmds []string) {
 			}
 		} else {
 			str += getFormatValueStr(&re, 0)
-			if str[len(str)-1] == '\n' {
-				fmt.Print(str)
-			} else {
-				fmt.Println(str)
+			if len(str) > 0 {
+				if str[len(str)-1] == '\n' {
+					fmt.Print(str)
+				} else {
+					fmt.Println(str)
+				}
 			}
 		}
 	}

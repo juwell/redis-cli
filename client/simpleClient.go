@@ -148,6 +148,7 @@ func (m *SimpleClient) readGoroutine() {
 		recover()
 	}()
 	data := make([]byte, 1024*16)
+	var total []byte
 	r := bufio.NewReader(m.conn)
 	for {
 		select {
@@ -158,6 +159,7 @@ func (m *SimpleClient) readGoroutine() {
 		default:
 		}
 		n, err := r.Read(data)
+		// log.Println("[debug]", string(data[:n]))
 		// fmt.Println(`[debug]`, string(data))
 		// _, err := r.Read(data)
 		if err != nil {
@@ -166,8 +168,30 @@ func (m *SimpleClient) readGoroutine() {
 			return
 		}
 
-		m.readBuff <- Buffer{
-			Buff: data[:n],
+		if string(data[n-2:n]) == "\r\n" {
+			if total == nil {
+				// log.Println("[debug1]", string(data[:n]))
+				m.readBuff <- Buffer{
+					Buff: data[:n],
+				}
+			} else {
+				// 合并
+				total = append(total, data[:n]...)
+				// log.Println("[debug2]", string(total))
+				m.readBuff <- Buffer{
+					Buff: total,
+				}
+				total = nil
+			}
+		} else {
+			// 等下一个包
+			if total == nil {
+				total = make([]byte, 0, n)
+				total = append(total, data[:n]...)
+			} else {
+				// 合并
+				total = append(total, data[:n]...)
+			}
 		}
 	}
 }
