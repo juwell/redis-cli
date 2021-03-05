@@ -27,11 +27,6 @@ var (
 	Infinity float64 = HugeEnuf * HugeEnuf
 )
 
-type commands struct {
-	c        *SimpleClient
-	replyBuf chan RedisReply
-}
-
 type RedisReply struct {
 	Reply interface{}
 	Type  rune
@@ -112,6 +107,13 @@ func (r *RedisReply) GetArray() []RedisReply {
 	return r.Reply.([]RedisReply)
 }
 
+// ***********************************************************
+
+type commands struct {
+	c        *SimpleClient
+	replyBuf chan RedisReply
+}
+
 func (c *commands) init() {
 	c.c.SetHandler(c.handler)
 	c.replyBuf = make(chan RedisReply, 1)
@@ -153,20 +155,7 @@ func (c *commands) getReply() RedisReply {
 	return r
 }
 
-// HGet
-// func (c *commands) HGet(key string, field string) RedisReply {
-// 	err := c.c.Send([]byte(fmt.Sprintf("HGET %s %s\r\n", key, field)))
-// 	if err != nil {
-// 		fmt.Printf("HGET Send err:%v\n", err)
-// 		return RedisReply{
-// 			Err: err,
-// 		}
-// 	}
-
-// 	// todo 这里有可能会拿到别的消息, 除非服务端能保证不会主动下发消息
-// 	return c.getReply()
-// }
-
+// Do 单次来回
 func (c *commands) Do(args ...string) RedisReply {
 	err := c.c.Send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
 	if err != nil {

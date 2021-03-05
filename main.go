@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	fmt.Println(os.Getpid())
+	// fmt.Println("(debug)", os.Getpid())
 
 	// inputReader := bufio.NewReader(os.Stdin)
 	// inputReader.ReadString('\n')
@@ -162,17 +162,8 @@ func working(cmds []string) {
 		return
 	}
 
-	// t := make([]interface{}, 0, len(cmds))
-	// for _, s := range cmds {
-	// 	// fmt.Println(`s:`, s)
-	// 	if len(s) <= 0 {
-	// 		continue
-	// 	}
-	// 	t = append(t, s)
-	// }
 	str := ``
 
-	// fmt.Println(`here`)
 	switch cmds[0] {
 	case "monitor":
 		cmd.MonitorCmd.SetArgs(cmds)
@@ -206,13 +197,6 @@ func working(cmds []string) {
 					os.Exit(1)
 					return
 				}
-
-				// if err := client.Cli.Redirection(); err != nil {
-				// 	fmt.Println(err)
-				// 	os.Exit(1)
-				// 	return
-				// }
-
 				// 加上重定向提示
 				str = fmt.Sprintf("-> Redirected to slot [%d] located at %s\n", slot, host)
 				goto DOCOMMAND
@@ -228,113 +212,6 @@ func working(cmds []string) {
 				fmt.Println(str)
 			}
 		}
-		// ctx := context.Background()
-		// re := client.Cli.Do(ctx, t...)
-		// val, err := re.Result()
-		// switch {
-		// case err == redis.Nil:
-		// 	fmt.Println(`(nil)`)
-
-		// case err != nil:
-		// 	errStr := err.Error()
-		// 	if client.Cfg.ClusterMode &&
-		// 		(len(errStr) > 5 && errStr[:5] == `MOVED`) ||
-		// 		(len(errStr) > 3 && errStr[:3] == `ASK`) {
-		// 		// 集群模式的重定向
-		// 		slot := 0
-		// 		host := ``
-		// 		info := ``
-		// 		fmt.Sscanf(errStr, `%s %d %s`, &info, &slot, &host)
-		// 		temp := strings.Split(host, `:`)
-		// 		if len(temp) == 2 {
-		// 			client.Cfg.HostIP = temp[0]
-		// 			client.Cfg.HostPort = temp[1]
-		// 		}
-		// 		client.Cfg.HostSocket = host
-
-		// 		if err := client.Cli.Redirection(); err != nil {
-		// 			fmt.Println(err)
-		// 			os.Exit(1)
-		// 			return
-		// 		}
-
-		// 		// 加上重定向提示
-		// 		str = fmt.Sprintf("-> Redirected to slot [%d] located at %s\n", slot, host)
-		// 		goto DOCOMMAND
-		// 	} else {
-		// 		fmt.Println(`(error) ` + err.Error())
-		// 	}
-
-		// case err == nil:
-
-		// 	// fmt.Println(`here4`, fmt.Sprintf(`type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind()))
-		// 	switch reflect.TypeOf(val).Kind() {
-		// 	case reflect.String:
-		// 		str += `"` + val.(string) + `"`
-		// 	case reflect.Int64:
-		// 		str += fmt.Sprintf(`(integer) %v`, val.(int64))
-		// 	case reflect.Slice:
-		// 		temp := val.([]interface{})
-		// 		if len(temp) <= 0 {
-		// 			str += `(empty array)`
-		// 		}
-		// 		for i, s := range temp {
-		// 			if i > 0 {
-		// 				str += "\n"
-		// 			}
-		// 			str += fmt.Sprintf(`%d) `, i+1)
-		// 			switch reflect.TypeOf(s).Kind() {
-		// 			case reflect.String:
-		// 				str += fmt.Sprintf(`"%s"`, s.(string))
-		// 			case reflect.Int64:
-		// 				str += fmt.Sprintf(`(integer) %v`, s.(int64))
-		// 			case reflect.Slice:
-		// 				temp2 := s.([]interface{})
-		// 				if len(temp2) <= 0 {
-		// 					str += fmt.Sprintf(`(empty array) %v`, s.(int64))
-		// 				}
-		// 				for t, v := range temp2 {
-		// 					if t > 0 {
-		// 						str += "\n   "
-		// 					}
-		// 					str += fmt.Sprintf("%d) ", t+1)
-		// 					switch reflect.TypeOf(v).Kind() {
-		// 					case reflect.String:
-		// 						str += fmt.Sprintf(`"%s"`, v.(string))
-		// 					case reflect.Int64:
-		// 						str += fmt.Sprintf(`(integer) %v`, v.(int64))
-		// 					case reflect.Slice:
-		// 						temp3 := v.([]interface{})
-		// 						if len(temp3) <= 0 {
-		// 							str += fmt.Sprintf(`(empty array) %v`, v.(int64))
-		// 						}
-
-		// 						for z, x := range temp3 {
-		// 							if z > 0 {
-		// 								str += "\n      "
-		// 							}
-
-		// 							str += fmt.Sprintf("%d) ", z+1)
-		// 							switch reflect.TypeOf(x).Kind() {
-		// 							case reflect.String:
-		// 								str += fmt.Sprintf(`"%s"`, x.(string))
-		// 							case reflect.Int64:
-		// 								str += fmt.Sprintf(`(integer) %v`, x.(int64))
-		// 							default:
-		// 								str += fmt.Sprintf(`err type3:%v, kind:%v`, reflect.TypeOf(x), reflect.TypeOf(x).Kind())
-		// 							}
-		// 						}
-		// 					}
-		// 				}
-		// 			default:
-		// 				str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(s), reflect.TypeOf(s).Kind())
-		// 			}
-		// 		}
-		// 	default:
-		// 		str += fmt.Sprintf(`err type:%v, kind:%v`, reflect.TypeOf(val), reflect.TypeOf(val).Kind())
-		// 	}
-		// 	fmt.Println(str)
-		// }
 	}
 }
 

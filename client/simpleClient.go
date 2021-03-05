@@ -154,7 +154,7 @@ func (m *SimpleClient) readGoroutine() {
 		default:
 		}
 		n, err := r.Read(data)
-		// fmt.Println(`[test]`, string(data))
+		// fmt.Println(`[debug]`, string(data))
 		// _, err := r.Read(data)
 		if err != nil {
 			// fmt.Println("(debug)", err)
