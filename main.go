@@ -188,6 +188,10 @@ func working(cmds []string) {
 		cli.Doing(func(reply client.RedisReply) {
 			fmt.Println(getFormatValueStr(&reply, 0))
 		}, cmds...)
+	case "SHUTDOWN":
+		cli.Send(cmds...)
+		// todo 先直接退出, 加入自动重连后再修改
+		os.Exit(0)
 	default:
 		// 直接发到服务器, 然后打印返回信息
 	DOCOMMAND:

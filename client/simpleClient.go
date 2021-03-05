@@ -211,7 +211,7 @@ func (m *SimpleClient) writeGoroutine() {
 	}
 }
 
-func (m *SimpleClient) Send(data []byte) error {
+func (m *SimpleClient) send(data []byte) error {
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println("(debug)", err)

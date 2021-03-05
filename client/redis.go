@@ -157,7 +157,13 @@ func (c *commands) getReply() RedisReply {
 
 // Do 单次来回
 func (c *commands) Do(args ...string) RedisReply {
-	err := c.c.Send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
+	if len(args) <= 0 {
+		return RedisReply{
+			Err: errors.New("Command can't be empty"),
+		}
+	}
+
+	err := c.c.send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
 	if err != nil {
 		return RedisReply{
 			Err: err,
@@ -174,7 +180,11 @@ func (c *commands) Doing(fn func(reply RedisReply), args ...string) error {
 		return errors.New(`Doing function is nil`)
 	}
 
-	err := c.c.Send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
+	if len(args) <= 0 {
+		return errors.New("Command can't be empty")
+	}
+
+	err := c.c.send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
 	if err != nil {
 		return err
 	}
@@ -188,6 +198,15 @@ func (c *commands) Doing(fn func(reply RedisReply), args ...string) error {
 			fn(r)
 		}
 	}
+}
+
+// Send 只发送, 不接收
+func (c *commands) Send(args ...string) error {
+	if len(args) <= 0 {
+		return errors.New("Command can't be empty")
+	}
+
+	return c.c.send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
 }
 
 // 返回读取到的类型, 已经已读取的字节数
