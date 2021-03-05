@@ -13,6 +13,10 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+type Buffer struct {
+	Buff []byte
+}
+
 // SimpleClient 重写了redis连接客户端, 名字没有想好, 先随便用这个了
 type SimpleClient struct {
 	commands
@@ -185,7 +189,9 @@ func (m *SimpleClient) writeGoroutine() {
 
 func (m *SimpleClient) Send(data []byte) error {
 	defer func() {
-		recover()
+		if err := recover(); err != nil {
+			fmt.Println("(debug)", err)
+		}
 	}()
 
 	select {

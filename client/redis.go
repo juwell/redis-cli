@@ -168,6 +168,28 @@ func (c *commands) Do(args ...string) RedisReply {
 	return c.getReply()
 }
 
+// Doing 会阻塞, 持续读取服务器返回
+func (c *commands) Doing(fn func(reply RedisReply), args ...string) error {
+	if fn == nil {
+		return errors.New(`Doing function is nil`)
+	}
+
+	err := c.c.Send([]byte(fmt.Sprintf("%s\r\n", strings.Join(args, ` `))))
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case r, ok := <-c.replyBuf:
+			if !ok {
+				return nil
+			}
+			fn(r)
+		}
+	}
+}
+
 // 返回读取到的类型, 已经已读取的字节数
 func (c *commands) processItem(data []byte) (RedisReply, int) {
 	out := RedisReply{}
@@ -176,11 +198,13 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 	out.Type = rune(data[0])
 	switch data[0] {
 	case ErrorReply:
-		out.Err = errors.New(string(data[1 : len(data)-2]))
-		readCount = len(data)
+		i := strings.Index(string(data), "\r\n")
+		out.Err = errors.New(string(data[1:i]))
+		readCount = i
 	case StatusReply:
-		out.Reply = string(data[1 : len(data)-2])
-		readCount = len(data)
+		i := strings.Index(string(data), "\r\n")
+		out.Reply = string(data[1:i])
+		readCount = i
 	case StringReply:
 		// todo 字符串不能这样直接赋值, 字符串还标出了长度
 		fallthrough
@@ -238,7 +262,9 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 		}
 		readCount = strings.Index(string(data), "\r\n")
 	case PushReply:
-		// fallthrough
+		i := strings.Index(string(data), "\r\n")
+		fmt.Printf("(debug) Push:%v", string(data[1:i]))
+		readCount = i
 	case ArrayReply:
 		i := strings.Index(string(data), "\r\n")
 		readCount = i
@@ -255,10 +281,13 @@ func (c *commands) processItem(data []byte) (RedisReply, int) {
 			out.Reply = arry
 		}
 	case MapReply:
-		fmt.Printf("(debug) Map:%v", string(data))
+		i := strings.Index(string(data), "\r\n")
+		fmt.Printf("(debug) Map:%v", string(data[1:i]))
+		readCount = i
 	case SetReply:
-
-		fmt.Printf("(debug) Set:%v", string(data))
+		i := strings.Index(string(data), "\r\n")
+		fmt.Printf("(debug) Set:%v", string(data[1:i]))
+		readCount = i
 	default:
 		out.Err = fmt.Errorf(`Protocol error, got %s as reply type byte`, data)
 	}

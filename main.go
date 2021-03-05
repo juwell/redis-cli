@@ -164,10 +164,17 @@ func working(cmds []string) {
 
 	str := ``
 
-	switch cmds[0] {
+	c := strings.ToLower(cmds[0])
+	switch c {
+	case "subscribe":
+		fmt.Println("Reading messages... (press Ctrl-C to quit)")
+		fallthrough
 	case "monitor":
-		cmd.MonitorCmd.SetArgs(cmds)
-		cmd.MonitorCmd.Execute()
+		// cmd.MonitorCmd.SetArgs(cmds)
+		// cmd.MonitorCmd.Execute()
+		cli.Doing(func(reply client.RedisReply) {
+			fmt.Println(getFormatValueStr(&reply, 0))
+		}, cmds...)
 	default:
 		// 直接发到服务器, 然后打印返回信息
 	DOCOMMAND:
