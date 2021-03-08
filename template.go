@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"redis-cli/client"
 	"redis-cli/cmd"
 )
 
@@ -17,7 +16,7 @@ To get help about Redis commands type:
 To set redis-cli preferences:
     ":set hints" enable online hints
     ":set nohints" disable online hints
-Set your preferences in ~/.redisclirc`, client.Version(), client.RedisVersion())
+Set your preferences in ~/.redisclirc`, Version, RedisVersion)
 }
 
 func usage() {
@@ -112,7 +111,7 @@ Examples:
   (Note: when using --eval the comma separates KEYS[] from ARGV[] items)
 When no command is given, redis-cli starts in interactive mode.
 Type "help" in interactive mode for information on available commands
-and settings.`, client.Version(), client.RedisVersion())
+and settings.`, Version, RedisVersion)
 }
 
 func usageTemplate() string {
@@ -151,5 +150,5 @@ func commandHelpTemplate(h cmd.CommandHelp) string {
 }
 
 func versionTemplate() string {
-	return fmt.Sprintf("redis-cli(by golang) %s for redis-server %s\n", client.Version(), client.RedisVersion())
+	return fmt.Sprintf("redis-cli(by golang) %s for redis-server %s\n", Version, RedisVersion)
 }

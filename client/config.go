@@ -31,13 +31,3 @@ func NewConfig() *Config {
 		HostSocket: ``,
 	}
 }
-
-// Version 返回当前版本号
-func Version() string {
-	return `0.0.1`
-}
-
-// RedisVersion 返回支持的最新的redis版本号
-func RedisVersion() string {
-	return `6.0.10`
-}

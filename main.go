@@ -33,7 +33,7 @@ func main() {
 
 	root := &cobra.Command{
 		Run:     doOnce,
-		Version: client.Version(),
+		Version: Version,
 		// DisableFlagsInUseLine: false,
 	}
 	root.Flags().Bool(`help`, false, `help for this command`)
