@@ -4,6 +4,8 @@
 @mkdir out
 
 @REM !!!! Modify Those Variable First !!!!
+@REM "version" is redis-cli's version, "redisVersion" is redis-server's version
+@REM this "version" of redis client can be used assurable for redis-server at the version less than or equal to "redisVersion"
 @set version=0.1.1
 @set redisVersion=6.2.1
 @REM !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
